@@ -12,36 +12,53 @@ import {
   useWaitForTransaction,
 } from "@starknet-react/core";
 import { BlockNumber } from "starknet";
-import contractAbi from "../abis/abi.json";
+//import contractAbi from "../abis/abi.json";
+import contractAbiERC20 from "../abis/abi_erc20.json";
 import { useState, useMemo } from 'react';
 
 const WalletBar = dynamic(() => import('../components/WalletBar'), { ssr: false })
 const Page: React.FC = () => {
 
   // Step 1 --> Read the latest block -- Start
-  const { data: blockNumberData, isLoading: blockNumberIsLoading, isError: blockNumberIsError } = useBlockNumber({
+  const { 
+    data: blockNumberData, 
+    isLoading: blockNumberIsLoading, 
+    isError: blockNumberIsError 
+  } = useBlockNumber({
     blockIdentifier: 'latest' as BlockNumber
   });
-  const workshopEnds = 68224;
+  const workshopEnds = 187920;
   // Step 1 --> Read the latest block -- End
 
   // Step 2 --> Read your balance -- Start
   const { address: userAddress } = useAccount();
-  const { isLoading: balanceIsLoading, isError: balanceIsError, error: balanceError, data: balanceData } = useBalance({
+  const { 
+    isLoading: balanceIsLoading, 
+    isError: balanceIsError, 
+    error: balanceError, 
+    data: balanceData 
+  } = useBalance({
     address: userAddress,
     watch: true
   });
   // Step 2 --> Read your balance -- End
 
   // Step 3 --> Read from a contract -- Start
-  const contractAddress = "0x1e599a44cb196b0fa8e6af83457301e89adfb32e158fa3044cc57c4a823e877";
-  const { data: readData, refetch: dataRefetch, isError: readIsError, isLoading: readIsLoading, error: readError } = useContractRead({
-    functionName: "get_balance",
-    args: [],
-    abi: contractAbi,
+  const contractAddress = "0x01f6ce3402f17f360b253fe0d9a94aa1fb832aacfcba099813657565a271c449";
+  const { 
+    data: readData, 
+    refetch: dataRefetch, 
+    isError: readIsError, 
+    isLoading: readIsLoading, 
+    error: readError 
+  } = useContractRead({
+    functionName: "balance_of",
+    args: [userAddress!],
+    abi: contractAbiERC20,
     address: contractAddress,
     watch: true,
   });
+  
   // Step 3 --> Read from a contract -- End
 
   // Step 4 --> Write to a contract -- Start
@@ -53,12 +70,15 @@ const Page: React.FC = () => {
     writeAsync();
   };
   const { contract } = useContract({
-    abi: contractAbi,
+    abi: contractAbiERC20,
     address: contractAddress,
   });
   const calls = useMemo(() => {
     if (!userAddress || !contract) return [];
-    return contract.populateTransaction["increase_balance"]!({ low: (amount ? amount : 0), high: 0 });
+    return contract.populateTransaction["mint"]!(userAddress, { 
+      low: (amount ? amount : 0), 
+      high: 0,
+     });
   }, [contract, userAddress, amount]);
   const {
     writeAsync,
@@ -68,7 +88,11 @@ const Page: React.FC = () => {
     calls,
   });
   const explorer = useExplorer();
-  const { isLoading: waitIsLoading, isError: waitIsError, error: waitError, data: waitData } = useWaitForTransaction({ hash: writeData?.transaction_hash, watch: true })
+  const { 
+    isLoading: waitIsLoading, 
+    isError: waitIsError, 
+    error: waitError, data: waitData 
+  } = useWaitForTransaction({ hash: writeData?.transaction_hash, watch: true })
   const LoadingState = ({ message }: { message: string }) => (
     <div className="flex items-center space-x-2">
       <div className="animate-spin">
@@ -119,13 +143,7 @@ const Page: React.FC = () => {
           {blockNumberData! < workshopEnds ? "We're live on Workshop" : "Workshop has ended"}
         </div>
       )}
-      {/* <div
-        className={`p-4 w-full max-w-md m-4 border-black border bg-white`}
-      >
-        <h3 className="text-2xl font-bold mb-2">Read the Blockchain</h3>
-        <p>Current Block Number: xyz</p>
-        Are we live?
-      </div> */}
+
       {/* Step 1 --> Read the latest block -- End */}
 
       {/* Step 2 --> Read your balance -- Start */}
@@ -138,13 +156,7 @@ const Page: React.FC = () => {
           <p>Balance: {Number(balanceData?.formatted).toFixed(4)}</p>
         </div>
       )}
-      {/* <div
-        className={`p-4 w-full max-w-md m-4 bg-white border-black border`}
-      >
-        <h3 className="text-2xl font-bold mb-2">Read your Balance</h3>
-        <p>Symbol: Ticker</p>
-        <p>Balance: xyz</p>
-      </div> */}
+
       {/* Step 2 --> Read your balance -- End */}
 
       {/* Step 3 --> Read from a contract -- Start */}
@@ -162,25 +174,12 @@ const Page: React.FC = () => {
           </button>
         </div>
       </div>
-      {/* <div
-        className={`p-4 w-full max-w-md m-4 bg-white border-black border`}
-      >
-        <h3 className="text-2xl font-bold mb-2">Read your Contract</h3>
-        <p>Balance: xyz</p>
-        <div className="flex justify-center pt-4">
-          <button
-            onClick={() => console.log("Refresh")}
-            className={`border border-black text-black font-regular py-2 px-4 bg-yellow-300 hover:bg-yellow-500`}
-          >
-            Refresh
-          </button>
-        </div>
-      </div> */}
+
       {/* Step 3 --> Read from a contract -- End */}
 
       {/* Step 4 --> Write to a contract -- Start */}
       <form onSubmit={handleSubmit} className="bg-white p-4 w-full max-w-md m-4 border-black border">
-        <h3 className="text-2xl font-bold mb-2">Write to a Contract</h3>
+        <h3 className="text-2xl font-bold mb-2">Mint ERC20</h3>
         <label
           htmlFor="amount"
           className="block text-sm font-medium leading-6 text-gray-900"
@@ -199,7 +198,9 @@ const Page: React.FC = () => {
             href={explorer.transaction(writeData?.transaction_hash)}
             target="_blank"
             className="text-blue-500 hover:text-blue-700 underline"
-            rel="noreferrer">Check TX on {explorer.name}</a>
+            rel="noreferrer"
+          >
+              Check TX on {explorer.name}</a>
         )}
         <div className="flex justify-center pt-4">
           <button
@@ -211,35 +212,7 @@ const Page: React.FC = () => {
           </button>
         </div>
       </form>
-      {/* <form onSubmit={handleSubmit} className="bg-white p-4 w-full max-w-md m-4 border-black border">
-        <h3 className="text-2xl font-bold mb-2">Write to a Contract</h3>
-        <label
-          htmlFor="amount"
-          className="block text-sm font-medium leading-6 text-gray-900"
-        >
-          Amount:
-        </label>
-        <input
-          type="number"
-          id="amount"
-          value={amount}
-          onChange={(event) => setAmount(event.target.valueAsNumber)}
-          className="block w-full px-3 py-2 text-sm leading-6 border-black focus:outline-none focus:border-yellow-300 black-border-p"
-        />
-        <a
-          href={"https://x.com/0xNestor"}
-          target="_blank"
-          className="text-blue-500 hover:text-blue-700 underline"
-          rel="noreferrer">Check TX on an explorer</a>
-        <div className="flex justify-center pt-4">
-          <button
-            type="submit"
-            className={`border border-black text-black font-regular py-2 px-4 bg-yellow-300 hover:bg-yellow-500`}
-          >
-            Send
-          </button>
-        </div>
-      </form> */}
+
       {/* Step 4 --> Write to a contract -- End */}
 
     </div>
